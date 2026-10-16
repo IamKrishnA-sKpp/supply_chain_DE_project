@@ -1,2 +1,2 @@
 # supply_chain_DE_Project
-Sanmina GEMS Maestro Project
+Supply Chain Data Extraction, Transformation & Loading.
