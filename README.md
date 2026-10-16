@@ -1,2 +1,2 @@
-# sanm_gems_xx01
+# supply_chain_DE_Project
 Sanmina GEMS Maestro Project
