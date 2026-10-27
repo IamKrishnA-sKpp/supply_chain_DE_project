@@ -35,20 +35,67 @@ Company Name : 'Enigma'
 
 ##
 
-### Project Architecture : Medallion } Bronze → Silve → Gold
+## 📁 Project Architecture & Flow : Bronze → Silve → Gold (Medallion Architecture)
 
-#### Data Extraction from Source to Bronze Layer
-##### Flow of Steps
+### ✅ STEP 1 : Data Extraction from Source to Bronze Layer
+
+#### Flow of Steps ⬇️
 1. For CDC Method → Extract the Database Logs using Oracle Golden Gate as .csv files and copy them into a sftp server.
 2. For Full Load/Refresh Method → In-Database PL/SQL Procedure to extract the full table into one or more .csv files and copy them into a sftp server.
 3. sftp server will act as a staging between the Source Oracle Database and the Bronze Layer Storage in ADLS.
 4. All the .csv files under a particular location in the sftp server will be copied to the bronze/raw_data under 'enigmastoragxx.enigma-container' storage account in ADLS.
 5. File naming convention will be as '<source_system>_<schema>_<table>_<extract_timestamp>_<batch_id>.csv' which is very critical for dataloading into particular tables.
 6. Once the files are loaded into the raw_data folder, we will now convert the .csv files into .parquet files and move them into the folder bronze/processed_data.
-##### Execution Steps
-1. Oracle Database logs would be read by the Oracle Golden Gate tool and generates the .csv files directly under a Filesystem in sftp server hosted in Azure Virtual Machine.
-2. The .csv files generated under the filesystem would be copied to bronze/raw_data using 'COPY ACTIVITY' under Azure Data Factory.
-3. For this activity we will have two Linked Services "Source → SFTP Linked Service(Azure VM)"  <--->  "Sink  → Azure Data Lake Storage Gen2 Linked Service"
-<img width="1782" height="883" alt="Azure SFTP to ADLS Gen2 Pipeline" src="https://github.com/user-attachments/assets/a8c6624b-fbf0-4eee-bee8-487b0208cbda" />
+7. Oracle Database logs would be read by the Oracle Golden Gate tool and generates the .csv files directly under a Filesystem in sftp server hosted in Azure Virtual Machine.
+8. The .csv files generated under the filesystem would be copied to bronze/raw_data using 'COPY ACTIVITY' under Azure Data Factory.
+9. For this activity we will have two Linked Services "Source → SFTP Linked Service(Azure VM)"  <--->  "Sink  → Azure Data Lake Storage Gen2 Linked Service".
+10. Once the 1st 'COPY ACTIVITY' completes, we will initiate another 'COPY ACTIVITY' to convert the .csv files under bronze/raw_data into .parquet files into bronze/processed.
 
+<br>
+  
+```text
+Data Extraction from Source to Bronze Layer
+│
+└── adf/
+   ├── linked_services/
+   │   ├── LS_SFTP_Source.json           # SFTP server on Azure VM
+   │   └── LS_ADLS_Gen2_Bronze.json      # ADLS Gen2 Bronze storage
+   │
+   ├── datasets/
+   │   ├── DS_SFTP_Source_CSV.json       # Source CSV dataset
+   │   └── DS_ADLS_Bronze_CSV.json       # Destination CSV dataset
+   │
+   └── activities/
+       ├── COPY ACTIVITY 1          #Source sftp to bronze raw_data
+       │      ├── Source/ (etlsftp.enigma.com)                            # Source Server
+       │      │         └── /etl_data/                                    # Source Filesystem
+       │      │                ├── orders_20261027T153000Z_batch001.csv
+       │      │                ├── products_20261027T153000Z_batch001.csv
+       │      │                ├── customers_20261027T153000Z_batch001.csv
+       │      │                └── inventory_20261027T153000Z_batch001.csv
+       │      │
+       │      └── Sink/ (ADLS : enigmastoragxx.enigma-container)          # Sink Storage
+       │                 └── /bronze/raw_data/                            # Sink Filesystem
+       │                        ├── orders_20261027T153000Z_batch001.csv
+       │                        ├── products_20261027T153000Z_batch001.csv
+       │                        ├── customers_20261027T153000Z_batch001.csv
+       │                        └── inventory_20261027T153000Z_batch001.csv
+       │
+       └── COPY ACTIVITY 2          #csv to parquet
+                ├── Source/ (ADLS : enigmastoragxx.enigma-container)               # Source Storage
+                │         └── /bronze/raw_data/                                    # Source Filesystem
+                │                ├── orders_20261027T153000Z_batch001.csv
+                │                ├── products_20261027T153000Z_batch001.csv
+                │                ├── customers_20261027T153000Z_batch001.csv
+                │                └── inventory_20261027T153000Z_batch001.csv
+                │
+                └── Sink/ (ADLS : enigmastoragxx.enigma-container)          # Sink Storage
+                        └── /bronze/processed/                              # Sink Filesystem
+                              ├── orders_20261027T153000Z_batch001.parquet
+                              ├── products_20261027T153000Z_batch001.parquet
+                              ├── customers_20261027T153000Z_batch001.parquet
+                              └── inventory_20261027T153000Z_batch001.parquet
+```
+##
 
+### ✅ STEP 2 : Data Loading from Bronze to Silver with Data Quality Checks
