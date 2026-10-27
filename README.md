@@ -35,9 +35,20 @@ Company Name : 'Enigma'
 
 ##
 
-### Project Architecture
+### Project Architecture : Medallion } Bronze → Silve → Gold
 
-#### Extraction
+#### Data Extraction from Source to Bronze Layer
+##### Flow of Steps
 1. For CDC Method → Extract the Database Logs using Oracle Golden Gate as .csv files and copy them into a sftp server.
 2. For Full Load/Refresh Method → In-Database PL/SQL Procedure to extract the full table into one or more .csv files and copy them into a sftp server.
-3. 
+3. sftp server will act as a staging between the Source Oracle Database and the Bronze Layer Storage in ADLS.
+4. All the .csv files under a particular location in the sftp server will be copied to the bronze/raw_data under 'enigmastoragxx.enigma-container' storage account in ADLS.
+5. File naming convention will be as '<source_system>_<schema>_<table>_<extract_timestamp>_<batch_id>.csv' which is very critical for dataloading into particular tables.
+6. Once the files are loaded into the raw_data folder, we will now convert the .csv files into .parquet files and move them into the folder bronze/processed_data.
+##### Execution Steps
+1. Oracle Database logs would be read by the Oracle Golden Gate tool and generates the .csv files directly under a Filesystem in sftp server hosted in Azure Virtual Machine.
+2. The .csv files generated under the filesystem would be copied to bronze/raw_data using 'COPY ACTIVITY' under Azure Data Factory.
+3. For this activity we will have two Linked Services "Source → SFTP Linked Service(Azure VM)"  <--->  "Sink  → Azure Data Lake Storage Gen2 Linked Service"
+<img width="1782" height="883" alt="Azure SFTP to ADLS Gen2 Pipeline" src="https://github.com/user-attachments/assets/a8c6624b-fbf0-4eee-bee8-487b0208cbda" />
+
+
